@@ -1,0 +1,199 @@
+\documentclass[11pt,a4paper]{amsart}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[margin=2.7cm]{geometry}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage{listings}
+
+\lstdefinelanguage{lean}{
+  morekeywords={def,abbrev,lemma,theorem,inductive,namespace,end,open,import,by,fun,if,then,else,match,with},
+  sensitive=true, morecomment=[l]{--}, morecomment=[s]{/-}{-/}, morestring=[b]"}
+\lstset{language=lean, basicstyle=\ttfamily\footnotesize, keywordstyle=\bfseries,
+  commentstyle=\itshape\color{black!60}, columns=fullflexible, keepspaces=true,
+  frame=single, framerule=0.3pt, rulecolor=\color{black!30}, xleftmargin=4pt, xrightmargin=4pt,
+  literate={ℕ}{{$\mathbb{N}$}}1 {ℤ}{{$\mathbb{Z}$}}1 {ℂ}{{$\mathbb{C}$}}1 {‖}{{$\|$}}1 {∈}{{$\in$}}1 {∪}{{$\cup$}}1 {≤}{{$\le$}}1 {ˢ}{{}}0 {∃}{{$\exists$}}1 {∀}{{$\forall$}}1 {¬}{{$\neg$}}1
+           {∧}{{$\wedge$}}1 {≠}{{$\ne$}}1 {→}{{$\to$}}1 {α}{{$\alpha$}}1 {⇒}{{$\Rightarrow$}}1}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\oeis}[1]{\href{https://oeis.org/#1}{#1}}
+\newcommand{\Z}{\mathbb{Z}}
+
+\title[Shannon's circle construction is a growing hexagon]{Shannon's circle construction is a growing hexagon:\\ proofs of the conjectured formulas for OEIS\\ A374338, A374337 and A400701 (verified in Lean~4)}
+\author{A-guy-with-AI}
+\date{November 11, 2026}
+
+\begin{document}
+
+\begin{abstract}
+Start with two points at distance $1$ and draw the unit circles around them. At each iteration, draw a unit circle around every new intersection point. S.~R.~Shannon (OEIS \oeis{A374338}, \oeis{A374337}, \oeis{A374339}, 2024) counted the vertices, regions and edges of the resulting arrangement and conjectured quasi-polynomial formulas of period $3$ for the vertices and the regions. We prove these conjectures. The key observation is that unit circles centred at points of the triangular lattice meet only at lattice points, so the construction is two-neighbour growth on the triangular lattice. We show that after $n\ge1$ iterations the vertex set is exactly the set of lattice points of an explicit hexagon, and we count its points, edges and regions. The same method proves the formula and the conjectured relation $\mathrm{A400701}(n)=\mathrm{A374338}(n)+4n+7$ for a variant with five initial points. The geometric reduction, the hexagonal shape and all counting formulas have been formalized and machine-checked in Lean~4 with Mathlib; only the identification of arcs with incidences and Euler's formula are left on paper.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+Shannon's construction~\cite{A374338} starts with two vertices at distance $1$ and draws the unit circles around them; their two intersection points are new vertices. At each subsequent iteration a unit circle is drawn around every new vertex, and all intersection points of the circles drawn so far become vertices. Let $V(n)$, $E(n)$ and $R(n)$ be the numbers of vertices, arcs (curved edges) and bounded regions after $n$ iterations (\oeis{A374338}, \oeis{A374339}, \oeis{A374337}):
+\[
+V:\ 4,8,14,24,34,46,62,\dots \qquad E:\ 6,18,40,78,132,\dots \qquad R:\ 3,11,27,55,99,\dots
+\]
+The OEIS entries record, as conjectures, the following formulas. Here $c_n=0,4,2$ according as $n\equiv0,1,2\pmod3$.
+
+\begin{theorem}\label{thm:main}
+For all $n\ge1$,
+\[
+V(n)=\frac{3n^2+5n+c_n}{3},\qquad
+R(n)=\begin{cases}(15n^2-17n-3)/3,& n\equiv0,\\ |15n^2-17n-7|/3,& n\equiv1,\\ (15n^2-17n+7)/3,& n\equiv2 \pmod 3.\end{cases}
+\]
+Moreover $E(1)=6$ and, for $n\ge2$, $E(n)=6n^2-4n+2$ if $n\equiv2\pmod3$ and $E(n)=6n^2-4n-2$ otherwise.
+\end{theorem}
+
+OEIS \oeis{A400701} (A.~Markey, 2026) studies the same growth rule on the triangular lattice, starting from five collinear adjacent points. Its entry gives a closed formula and a generating function obtained from the data (S.~A.~Irvine), and conjectures a relation with A374338.
+
+\begin{theorem}\label{thm:markey}
+For $n\ge2$, $\mathrm{A400701}(n)=(3n^2+17n+21+c_n)/3$. In particular $\mathrm{A400701}(n)=\mathrm{A374338}(n)+4n+7$.
+\end{theorem}
+
+\section{Reduction to the triangular lattice}
+
+Identify the plane with $\mathbb{C}$ and let $\Lambda=\Z[\omega]$, $\omega=e^{i\pi/3}$, with norm $N(a+b\omega)=a^2+ab+b^2$. Put the two initial points at $0$ and $1$.
+
+\begin{lemma}\label{lem:lattice}
+Let $c_1\ne c_2\in\Lambda$. The unit circles centred at $c_1$ and $c_2$ meet exactly at the points of $\Lambda$ at distance $1$ from both $c_1$ and $c_2$.
+\end{lemma}
+
+\begin{proof}
+Let $d=c_2-c_1$. The circles meet only if $|d|\le2$, i.e. $N(d)\le4$. Since $4N(a+b\omega)=(2a+b)^2+3b^2$, the nonzero values $\le4$ are $1,3,4$. They are attained exactly by $d=\varepsilon$, $d=\varepsilon(1+\omega)$ and $d=2\varepsilon$, where $\varepsilon$ is one of the six units. The common points are then $c_1+\varepsilon\omega^{\pm1}$; $c_1+\varepsilon$ and $c_1+\varepsilon\omega$; and the tangency point $c_1+\varepsilon$, respectively. All of them lie in $\Lambda$. Two distinct circles have at most two common points, so these are all of them. Conversely, a point at distance $1$ from both centres lies on both circles.
+\end{proof}
+
+Let $V_0=\{0,1\}$ and let $V_n$ be the vertex set after $n$ iterations. The circles drawn up to iteration $n$ are centred at the points of $V_{n-1}$. By induction and Lemma~\ref{lem:lattice}, all vertices lie in $\Lambda$, and
+\begin{equation}\label{eq:growth}
+V_n=V_{n-1}\cup N_2(V_{n-1}),
+\end{equation}
+where $N_2(S)$ is the set of lattice points having at least two lattice neighbours (points at distance $1$) in $S$. Thus the construction is \emph{two-neighbour (bootstrap) growth} on the triangular lattice. Tangency points are included in~\eqref{eq:growth}, as they are vertices of the arrangement. In fact they never create a vertex that would not be created otherwise (see the remark after Proposition~\ref{prop:hex}).
+
+\section{The exact shape}
+
+Write a lattice point $a+b\omega$ in the integer coordinates $(u,y)=(2a+b-1,\ b)$. The six neighbours of $(u,y)$ are $(u\pm2,y)$ and $(u\pm1,y\pm1)$, and $u+y$ has constant parity on the lattice. For integers $\alpha,\beta$ and $s\in\{0,1\}$ put
+\[
+H(\alpha,\beta;s)=\{(u,y)\in\Z^2:\ u+y\equiv s \ (\mathrm{mod}\ 2),\ |u|\le\alpha,\ |u|+3|y|\le\beta\}.
+\]
+This is the set of lattice points of a hexagon. Two of its sides are vertical, and the other four are perpendicular to lattice directions.
+
+\begin{proposition}\label{prop:hex}
+Let $\alpha\ge2$, $\beta\ge\alpha+2$ and $\beta\equiv s\pmod 2$. Then
+\[
+H(\alpha,\beta;s)\cup N_2\bigl(H(\alpha,\beta;s)\bigr)=H(\alpha+1,\beta+2;s).
+\]
+\end{proposition}
+
+\begin{proof}
+Write $H=H(\alpha,\beta;s)$ and $H'=H(\alpha+1,\beta+2;s)$. Clearly $H\subseteq H'$. The reflections $u\mapsto-u$ and $y\mapsto-y$ preserve $H$, $H'$, the parity condition and the set of neighbour displacements, so we may assume $u,y\ge0$. Note that $u+3y\equiv u+y\equiv s\equiv\beta\pmod2$.
+
+\emph{Points of $H'\setminus H$ have two neighbours in $H$.} If $u=\alpha+1$ and $y\ge1$, the neighbours $(u-2,y)$ and $(u-1,y-1)$ lie in $H$. If $u=\alpha+1$ and $y=0$, use $(\alpha,\pm1)$; this works because parity forces $\beta\ge\alpha+3$. Otherwise $u\le\alpha$ and $u+3y>\beta$, hence $u+3y=\beta+2$ by parity, and $y\ge1$. If $1\le u<\alpha$, use $(u\pm1,y-1)$. If $u=0$, the points $(\pm1,y-1)$ satisfy $1+3y-3=\beta$. If $u=\alpha$, use $(\alpha-1,y-1)$ and $(\alpha-2,y)$.
+
+\emph{Points outside $H'$ have at most one neighbour in $H$.} If $u\ge\alpha+2$, only $(u-2,y)$ can satisfy $|u'|\le\alpha$. Otherwise $u+3y\ge\beta+4$ by parity. A neighbour $(u+\delta,y+\eta)$ satisfies $|u+\delta|+3|y+\eta|\ge u+3y+\delta+3\eta$, so it lies in $H$ only if $\delta+3\eta\le-4$, i.e. $(\delta,\eta)=(-1,-1)$.
+\end{proof}
+
+\begin{remark}
+In each case of the first part, the two neighbours used are not opposite to each other. Hence the same growth holds if tangency points are not counted as vertices.
+\end{remark}
+
+\begin{corollary}\label{cor:shape}
+For every $n\ge1$, $V_n=H(n,2n+1;1)$. For the five-point seed of A400701, the set after $n\ge2$ iterations is $H(n+3,2n+4;0)$, in coordinates centred at the middle point.
+\end{corollary}
+
+\begin{proof}
+In our coordinates $V_0=\{(\pm1,0)\}$, and direct computation gives $V_1=\{(\pm1,0),(0,\pm1)\}=H(1,3;1)$ and $V_2=H(2,5;1)$ (eight points). Proposition~\ref{prop:hex} with $(\alpha,\beta)=(n,2n+1)$, $n\ge2$, gives the induction step. For A400701 the seed is $\{(0,0),(\pm2,0),(\pm4,0)\}$, and the base case $n=2$ is again checked directly.
+\end{proof}
+
+\section{Counting}
+
+\subsection{Vertices} The layer $H(n+1,2n+3;1)\setminus H(n,2n+1;1)$ consists of
+\begin{itemize}[leftmargin=2em]
+\item the \emph{side points} $|u|=n+1$, $3|y|\le n+2$, $y\equiv n\pmod2$;
+\item the \emph{cap points} $|u|\le n$, $|u|+3|y|=2n+3$.
+\end{itemize}
+For $n=6q+j$, each of these is a count of integers in intervals whose endpoints are affine in $q$. It equals $4q+\sigma_j$ side points and $8q+\kappa_j$ cap points, with
+\[
+(\sigma_j)_{j=0}^5=(2,4,2,4,6,4),\qquad(\kappa_j)_{j=0}^5=(2,0,4,6,4,8).
+\]
+Hence $V(n+1)-V(n)=2n+4$ if $3\mid n$ and $2n+2$ otherwise. Together with $V(1)=4$, this gives the formula for $V(n)$.
+
+\subsection{Edges} By Lemma~\ref{lem:lattice}, the vertices on the circle centred at $c\in V_{n-1}$ are exactly the neighbours of $c$ in $V_n$. There are at least two of them, and two distinct circles share no arc. So the circle is cut into as many arcs as it carries vertices, and
+\[
+E(n)=\sum_{c\in V_{n-1}}\#\{p\in V_n:\ |p-c|=1\}=6V(n-1)-M(n),
+\]
+where $M(n)$ is the number of lattice points outside $V_n$ with a neighbour in $V_{n-1}$. Each such point has exactly one neighbour there, by the second part of the proof of Proposition~\ref{prop:hex}. Listing them as in that proof gives $M(n)=2n-2$ if $n\equiv1\pmod3$ and $M(n)=2n+2$ otherwise, for $n\ge2$. Substituting gives the formula for $E(n)$. For $n=1$, each of the two circles carries three vertices (the two intersection points and the other initial point), so $E(1)=6$.
+
+\subsection{Regions} The union of the circles is connected, since each new circle passes through the centre of a circle that created its centre. Euler's formula, already recorded in the OEIS entries, therefore gives $R(n)=E(n)-V(n)+1$. Substituting the formulas for $V$ and $E$ gives Theorem~\ref{thm:main}. For instance, for $n=1$ we get $6-4+1=3=|15-17-7|/3$.
+
+\subsection{The five-point seed} For $H(n+3,2n+4;0)$ the side points of the layer are counted exactly as above. The two upper bounds for the cap points are larger by $1$, which adds four points per layer. This gives Theorem~\ref{thm:markey}, with $\mathrm{A400701}(2)=23=8+15$ as the initial value.
+
+\section{Formal verification in Lean 4}
+
+The file \texttt{A374338.lean} (925 lines) has been checked with Lean~4~\cite{lean4} \texttt{4.36.0-rc2} and Mathlib~\cite{mathlib} commit \texttt{9d581dff\allowbreak f2e41de989072ea63abf3daf69311520}. It contains no \texttt{sorry} and no \texttt{native\_decide}. The command \texttt{\#print axioms} reports only \texttt{propext}, \texttt{Classical.choice} and \texttt{Quot.sound} for all main theorems. The geometric construction is defined directly in $\mathbb{C}$:
+\begin{lstlisting}
+noncomputable def toPlane (p : Site) : ℂ := ⟨(p.1 : ℝ)/2, Real.sqrt 3*(p.2 : ℝ)/2⟩
+def circleStep (S : Set ℂ) : Set ℂ :=
+  S ∪ {z | ∃ c ∈ S, ∃ d ∈ S, c ≠ d ∧ ‖z-c‖ = 1 ∧ ‖z-d‖ = 1}
+
+theorem shannon_geometric_vertices (n : ℕ) (hn : 1 ≤ n) :
+    (((circleStep^[n]) (toPlane '' (seedShannon : Set Site))).ncard : ℤ) =
+      (3*(n : ℤ)^2 + 5*(n : ℤ) + correction n)/3
+\end{lstlisting}
+Here \texttt{seedShannon} consists of the two initial points, at distance $1$, and \texttt{correction n} is $c_n$. The file also proves Lemma~\ref{lem:lattice} (\texttt{circle\_intersections\_on\_lattice}), Proposition~\ref{prop:hex} (\texttt{grow\_hex}), Corollary~\ref{cor:shape} (\texttt{shannon\_shape}, \texttt{markey\_shape}), the formulas for $V$, for $E$ defined as the sum of the incidences above (\texttt{shannon\_edges}), and for $R$ defined as $E-V+1$ (\texttt{shannon\_regions}), together with Theorem~\ref{thm:markey} (\texttt{markey\_vertices}, \texttt{markey\_difference}).
+
+Two steps are not formalized: the identification of the arcs of the drawing with these incidences, and Euler's formula for the planar graph. Both are argued above. The SHA-256 digest of the published file is
+\begin{center}\small\texttt{3f07ccdda3e15e6d76270ec9deb8134314c1c8ac8f7192e5aaf6b94c071e0b4a}.\end{center}
+
+\section{Computations and prior work}
+
+An independent floating-point simulation of the actual circles, with no lattice assumption (\texttt{checks/simulation\_cercles.py}), reproduces all published terms: 52 terms each of A374338, A374337 and A400701, and 50 terms of A374339. Its results are identical for tolerances $10^{-6}$, $10^{-8}$ and $10^{-10}$, with or without tangency points.
+
+The closely related entry \oeis{A264788} (K.~Ngaokrajang, 2015) counts the circles added at each iteration of a similar construction (``flower of life''). For $n\ge3$, its terms coincide numerically with $V(n-1)-V(n-2)$, and C.~Barker gave a recurrence and a generating function for it from the data. Our results are consistent with these formulas, but we do not claim a proof for that entry, whose construction rule (``overlaps forbidden'') we have not formalized. The asymptotic shapes of threshold growth models were studied by Gravner and Griffeath~\cite{GG}. We found no previous proof of the exact finite-time shape or of the formulas above, but we cannot exclude one.
+
+\section*{Acknowledgements and use of AI}
+
+This work was carried out by the author, who publishes under a pseudonym, in collaboration with AI systems. Claude (Anthropic) found the reduction to the lattice, the hexagonal shape and the counting arguments, and wrote this paper. ChatGPT (OpenAI) reviewed the proofs and corrected two misprints, wrote the independent geometric simulation and the Lean formalization, and searched the literature. The author directed the project, ran the formal verification, and takes responsibility for the final text. The sequences and the conjectures are due to S.~R.~Shannon and A.~Markey; the formula for A400701 is due to S.~A.~Irvine.
+
+\begin{thebibliography}{9}
+
+\bibitem{GG}
+J.~Gravner and D.~Griffeath,
+\emph{Threshold growth dynamics},
+Trans. Amer. Math. Soc. \textbf{340} (1993), 837--870;
+\href{https://arxiv.org/abs/patt-sol/9303004}{arXiv:patt-sol/9303004}.
+
+\bibitem{lean4}
+L.~de~Moura and S.~Ullrich,
+\emph{The Lean 4 theorem prover and programming language},
+in: Automated Deduction -- CADE 28, Lecture Notes in Comput. Sci. \textbf{12699}, Springer, 2021, 625--635.
+
+\bibitem{mathlib}
+The mathlib Community,
+\emph{The Lean mathematical library},
+in: Proceedings of the 9th ACM SIGPLAN International Conference on Certified Programs and Proofs (CPP 2020), ACM, 2020, 367--381.
+
+\bibitem{A374338}
+OEIS Foundation Inc.,
+\emph{The On-Line Encyclopedia of Integer Sequences},
+entries \oeis{A374337}, \oeis{A374338}, \oeis{A374339} (S.~R.~Shannon, July 2024), \oeis{A400701} (A.~Markey, October 2026), \oeis{A264788} (K.~Ngaokrajang, 2015),
+\url{https://oeis.org}.
+
+\end{thebibliography}
+
+\end{document}
